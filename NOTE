@@ -1,0 +1,64 @@
+In the following example code:
+```
+#include <ncurses.h>
+
+int main() {
+    initscr();
+    
+    int screen_height, screen_width;
+    getmaxyx(stdscr, screen_height, screen_width);
+    
+    int win_height = 10;
+    int win_width = 30;
+    int win_y = (screen_height - win_height) / 2;
+    int win_x = (screen_width - win_width) / 2;
+    WINDOW *win = newwin(win_height, win_width, win_y, win_x);
+
+    box(win, 0, 0);   
+    mvwprintw(win, 1, 1, "Text in window...");
+
+
+
+    refresh();        // (1)
+    wrefresh(win);    // (2)
+
+
+
+    getch();
+
+    endwin();
+    return 0;
+}
+```
+it appears that (1) and (2) are both necessary, as the program breaks if you
+comment out either, although it only draws anything in `win`. This is confusing,
+because it seems to contradict `man curs refresh` which indicates that you only
+have to wrefresh on the specific window you're drawing in.
+
+Here's why removing either breaks it:
+if you remove (2), nothing in `win` is drawn, so `win` will not be drawn, which
+seems obvious enough.
+what is less obvious is that, because getch calls refresh, if you remove (1),
+then getch will call refresh, which will draw a blank screen, I think since
+initscr makes stdscr blank by default or something, so when we hit getch, it 
+draws the default blank screen *after* having drawn `win`, and overwrites it.
+
+So we have to do the first refresh to draw the default blank screen, so it won't
+overwrite anything later.
+
+Alternatively we can just do:
+```
+wrefresh(win);
+wgetch(win);
+```
+or even just
+```
+wgetch(win);
+```
+and avoid any direct calls to refresh or indirect calls through getch, because
+wgetch(win) calls wrefresh(win), so this draws `win` without drawing the stdscr
+buffer.
+
+However, the second method seems dangerous because you can easily forget and
+end up drawing the default empty screen in the middle of your program...
+
